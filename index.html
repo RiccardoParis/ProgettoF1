@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Race Replay (1996 - 2024)</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+    <header class="top-bar">
+        <h1>Dashboard F1: Race Replay</h1>
+        
+        <!-- Il menù a tendina è l'unico controllo rimasto -->
+        <div class="controls">
+            <label for="year-select">Seleziona Stagione: </label>
+            <select id="year-select"></select>
+        </div>
+    </header>
+
+    <main>
+        <!-- VISTA 1: Calendario Principale -->
+        <div id="calendar-view" class="view-section">
+            <div id="calendar-timeline" class="timeline-container"></div>
+        </div>
+
+        <!-- VISTA 2: Replay Singola Gara -->
+        <div id="race-replay-view" class="view-section hidden">
+            <div class="animation-controls" style="justify-content: flex-start;">
+                <button id="btn-back-calendar" class="control-btn" style="background: #555;">⬅ Torna al Calendario</button>
+                <div style="margin-left: 20px;">
+                    <h2 id="replay-race-title" style="margin: 0; color: #e10600;">Gran Premio</h2>
+                    <p id="replay-race-subtitle" style="margin: 0; color: #666; font-size: 0.9rem;">Stagione 0000 - Round 0</p>
+                </div>
+            </div>
+            
+            <div class="animation-controls">
+                <button id="btn-play-replay" class="control-btn">▶ Play</button>
+                
+                <select id="speed-select" style="margin-left: 10px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">
+                    <option value="1">1x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+
+                <input type="range" id="lap-slider" min="0" max="100" value="0" step="1">
+                <span id="lap-display">Giro 0</span>
+            </div>
+
+            <!-- Contenitore per l'animazione D3 -->
+            <div id="replay-container" style="background: white; border-radius: 8px; padding: 20px; min-height: 600px;">
+            </div>
+        </div>
+    </main>
+
+    <!-- Solo gli script necessari -->
+    <script src="js/calendar.js"></script>
+    <script src="js/replay_race.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
