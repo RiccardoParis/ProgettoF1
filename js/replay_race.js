@@ -31,7 +31,7 @@ function renderRaceReplay(year, round, raceName) {
         const timelineData = data.timeline;
         const metadata = data.metadata;
 
-        d3.select("#replay-race-subtitle").text(`Stagione ${year} - Round ${round} | Condizioni: ${metadata.weather}`);
+        d3.select("#replay-race-subtitle").text(`Stagione ${year} - Round ${round}`);
 
         currentLapIndex = 0;
         
@@ -58,6 +58,24 @@ function renderRaceReplay(year, round, raceName) {
         // Rimuoviamo eventuali vecchi listener prima di aggiungerne di nuovi
         d3.select("#btn-play-replay").on("click", null).on("click", toggleReplayPlay);
 
+        // NUOVO: Listener per il bottone -1 Giro
+        d3.select("#btn-prev-lap").on("click", null).on("click", function() {
+            if (isReplayPlaying) toggleReplayPlay(); // Ferma l'autoplay se attivo
+            if (currentLapIndex > 0) {
+                currentLapIndex--;
+                updateReplay(currentLapIndex);
+            }
+        });
+
+        // NUOVO: Listener per il bottone +1 Giro
+        d3.select("#btn-next-lap").on("click", null).on("click", function() {
+            if (isReplayPlaying) toggleReplayPlay(); // Ferma l'autoplay se attivo
+            if (currentLapIndex < replayData.length - 1) {
+                currentLapIndex++;
+                updateReplay(currentLapIndex);
+            }
+        });
+
         setupReplaySVG(timelineData, replayData.length - 1);
         updateReplay(currentLapIndex);
 
@@ -71,88 +89,158 @@ function setupReplaySVG(timelineData, totalLaps) {
     const container = d3.select("#replay-container");
     container.selectAll("*").remove();
 
-    const margin = { top: 60, right: 120, bottom: 20, left: 180 }; 
+    const timelineContainer = d3.select("#timeline-svg-container");
+    timelineContainer.selectAll("*").remove();
+
+    const margin = { top: 20, right: 120, bottom: 20, left: 180 }; 
     const width = container.node().getBoundingClientRect().width - margin.left - margin.right;
     const height = 650 - margin.top - margin.bottom;
 
-    const svg = container.append("svg")
+    // --- PREPARAZIONE DATI METEO ---
+    // Aggreghiamo il meteo giro per giro in blocchi continui per D3
+    const weatherPeriods = [];
+    if (replayData && replayData.length > 0) {
+        let currentW = replayData[0].weather.includes("Pioggia") ? "rain" : "sun";
+        let startLap = 0;
+        for (let i = 1; i <= totalLaps; i++) {
+            let lapData = replayData[i];
+            if (!lapData) continue;
+            let w = lapData.weather.includes("Pioggia") ? "rain" : "sun";
+            if (w !== currentW) {
+                weatherPeriods.push({ type: currentW, start: startLap, end: i });
+                currentW = w;
+                startLap = i;
+            }
+        }
+        weatherPeriods.push({ type: currentW, start: startLap, end: totalLaps });
+    }
+
+    // --- 1. DISEGNO DELLA TIMELINE (Container in alto) ---
+    const timelineSvg = timelineContainer.append("svg")
         .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
+        .attr("height", 85) // Alzato a 70px per ospitare due barre
         .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+        .attr("transform", `translate(${margin.left}, 45)`); // Spostato in basso (y=0 è la barra eventi)
         
-    const timelineGroup = svg.append("g")
-        .attr("class", "timeline-group")
-        .attr("transform", `translate(0, -40)`); 
-
-    timelineGroup.append("line")
-        .attr("x1", 0)
-        .attr("x2", width)
-        .attr("y1", 0)
-        .attr("y2", 0)
-        .attr("stroke", "#e0e0e0")
-        .attr("stroke-width", 4);
-
     const lapScale = d3.scaleLinear()
         .domain([0, totalLaps])
         .range([0, width]);
 
-    // 1. Aree Safety Car (Gialle)
+    // ==========================================
+    // BARRA METEO (Superiore)
+    // ==========================================
+    
+    // Etichetta Meteo
+    timelineSvg.append("text")
+        .attr("x", -15)
+        .attr("y", -24) // Posizionata in alto rispetto all'asse 0
+        .attr("text-anchor", "end")
+        .attr("alignment-baseline", "middle")
+        .style("font-size", "14px")
+        .text("☀️ / 🌧️");
+
+    // Maschera di ritaglio (ClipPath) per mantenere i bordi arrotondati della barra
+    timelineSvg.append("clipPath")
+        .attr("id", "weather-clip")
+        .append("rect")
+        .attr("x", 0).attr("y", -28)
+        .attr("width", width).attr("height", 8)
+        .attr("rx", 4).attr("ry", 4);
+
+    // Sfondo barra meteo
+    timelineSvg.append("rect")
+        .attr("x", 0).attr("y", -28)
+        .attr("width", width).attr("height", 8)
+        .attr("rx", 4).attr("ry", 4)
+        .attr("fill", "#e0e0e0");
+
+    // Segmenti Meteo
+    timelineSvg.append("g")
+        .attr("clip-path", "url(#weather-clip)")
+        .selectAll(".weather-segment")
+        .data(weatherPeriods)
+        .enter().append("rect")
+        .attr("x", d => lapScale(d.start))
+        .attr("y", -28)
+        .attr("width", d => Math.max(1, lapScale(d.end) - lapScale(d.start)))
+        .attr("height", 8)
+        .attr("fill", d => d.type === "sun" ? "#FADB5F" : "#4A90E2") // Giallo caldo vs Blu Pioggia
+        .append("title")
+        .text(d => d.type === "sun" ? `Sole (Giri ${d.start}-${d.end})` : `Pioggia (Giri ${d.start}-${d.end})`);
+
+
+    // ==========================================
+    // BARRA EVENTI (Inferiore)
+    // ==========================================
+
+    timelineSvg.append("rect")
+        .attr("x", 0).attr("y", -6)
+        .attr("width", width).attr("height", 12)
+        .attr("rx", 6).attr("ry", 6)
+        .attr("fill", "#e0e0e0")
+        .attr("stroke", "#cccccc").attr("stroke-width", 1);
+
+    timelineSvg.append("text")
+        .attr("x", -15) 
+        .attr("y", 0)
+        .attr("text-anchor", "end")
+        .attr("alignment-baseline", "middle")
+        .style("font-weight", "900")
+        .style("font-size", "12px")
+        .style("fill", "#15151e")
+        .text("START 🚥");
+
+    timelineSvg.append("text")
+        .attr("x", width + 15) 
+        .attr("y", 0)
+        .attr("text-anchor", "start")
+        .attr("alignment-baseline", "middle")
+        .style("font-weight", "900")
+        .style("font-size", "12px")
+        .style("fill", "#15151e")
+        .text("🏁 FINISH");
+
     if (timelineData.sc_periods) {
-        timelineGroup.selectAll(".sc-period-rect")
+        timelineSvg.selectAll(".sc-period-rect")
             .data(timelineData.sc_periods)
-            .enter()
-            .append("rect")
-            .attr("class", "sc-period") // Usa la classe CSS
-            .attr("x", d => lapScale(d.start))
-            .attr("y", -8)
-            .attr("width", d => Math.max(4, lapScale(d.end) - lapScale(d.start)))
-            .attr("height", 16)
-            .append("title")
-            .text(d => `Safety Car (Giri ${d.start} - ${d.end})`);
+            .enter().append("rect").attr("class", "sc-period")
+            .attr("x", d => lapScale(d.start)).attr("y", -6)
+            .attr("width", d => Math.max(4, lapScale(d.end) - lapScale(d.start))).attr("height", 12)
+            .attr("rx", 2)
+            .append("title").text(d => `Safety Car (Giri ${d.start} - ${d.end})`);
     }
 
-    // 2. Aree Virtual Safety Car (Arancioni)
     if (timelineData.vsc_periods) {
-        timelineGroup.selectAll(".vsc-period-rect")
+        timelineSvg.selectAll(".vsc-period-rect")
             .data(timelineData.vsc_periods)
-            .enter()
-            .append("rect")
-            .attr("class", "vsc-period") // Usa la classe CSS
-            .attr("x", d => lapScale(d.start))
-            .attr("y", -8)
-            .attr("width", d => Math.max(4, lapScale(d.end) - lapScale(d.start)))
-            .attr("height", 16)
-            .append("title")
-            .text(d => `Virtual Safety Car (Giri ${d.start} - ${d.end})`);
+            .enter().append("rect").attr("class", "vsc-period")
+            .attr("x", d => lapScale(d.start)).attr("y", -6)
+            .attr("width", d => Math.max(4, lapScale(d.end) - lapScale(d.start))).attr("height", 12)
+            .attr("rx", 2)
+            .append("title").text(d => `Virtual Safety Car (Giri ${d.start} - ${d.end})`);
     }
 
-    // 3. Icone Eventi sulla Timeline
     if (timelineData.events) {
         const eventsByLap = d3.group(timelineData.events, d => d.lap);
         eventsByLap.forEach((events, lap) => {
             const isRedFlag = events.some(e => e.type === "red_flag");
             const isRetirement = events.some(e => e.type === "retirement");
             const isDNS = events.some(e => e.type === "dns");
-            
             const isOvertakeTrack = events.some(e => e.type === "overtake_track");
             const isOvertakePit = events.some(e => e.type === "overtake_pit");
-            const isInherited = events.some(e => e.type === "position_inherited"); // Nuovo
+            const isInherited = events.some(e => e.type === "position_inherited");
 
-            // Gerarchia icone
             let icon = "📍";
             if (isRedFlag) icon = "🔴";
-            // Se c'è un ritiro E un vero sorpasso da qualche altra parte, usiamo il warning generico
             else if ((isRetirement || isDNS) && (isOvertakeTrack || isOvertakePit)) icon = "⚠️"; 
-            // Se c'è un ritiro e un'eredità di posizione, l'esplosione resta l'evento visivo chiave
             else if (isRetirement || isDNS) icon = "💥";
             else if (isOvertakeTrack) icon = "⚔️"; 
             else if (isOvertakePit) icon = "🔄";   
-            else if (isInherited) icon = "🎁"; // Se l'eredità avviene senza ritiri evidenti (es. penalità arretrate)
+            else if (isInherited) icon = "🎁"; 
 
             const tooltipText = events.map(e => `${e.driver.replace("_", " ").toUpperCase()}: ${e.text}`).join("\n");
 
-            const eventNode = timelineGroup.append("g")
+            const eventNode = timelineSvg.append("g")
                 .attr("transform", `translate(${lapScale(lap)}, 0)`)
                 .style("cursor", "pointer")
                 .on("click", () => {
@@ -161,25 +249,26 @@ function setupReplaySVG(timelineData, totalLaps) {
                     updateReplay(lap);
                 });
 
-            eventNode.append("circle").attr("r", 10).attr("fill", "white").attr("stroke", "#ccc");
+            eventNode.append("circle").attr("r", 9).attr("fill", "white").attr("stroke", "#999").attr("stroke-width", 1.5);
             eventNode.append("text")
-                .attr("text-anchor", "middle").attr("alignment-baseline", "middle").attr("font-size", "12px")
+                .attr("text-anchor", "middle").attr("alignment-baseline", "middle").attr("font-size", "11px")
                 .text(icon)
-                .append("title") 
-                .text(`Giro ${lap}:\n${tooltipText}`);
+                .append("title").text(`Giro ${lap}:\n${tooltipText}`);
         });
     }
 
-
+    // --- 2. DISEGNO DELLE AUTO (Container in basso) ---
+    const svg = container.append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+        
     svg.append("g").attr("class", "x-axis");
     svg.append("line")
         .attr("class", "finish-line")
-        .attr("x1", width)
-        .attr("x2", width)
-        .attr("y1", 0)
-        .attr("y2", height)
-        .attr("stroke", "#15151e")
-        .attr("stroke-width", 4)
+        .attr("x1", width).attr("x2", width).attr("y1", 0).attr("y2", height)
+        .attr("stroke", "#15151e").attr("stroke-width", 4)
         .attr("stroke-dasharray", "10,10"); 
 }
 
@@ -199,9 +288,6 @@ function updateReplay(index) {
     d3.select("#lap-display").text(`Giro ${lapData.lap} / ${replayData[replayData.length - 1].lap}`);
     d3.select("#lap-slider").property("value", index);
     
-    if (lapData.weather) {
-        d3.select("#replay-race-subtitle").text(`Stagione ${currentReplayYear} - Round ${currentReplayRound} | Condizioni: ${lapData.weather}`);
-    }
 
     const svg = d3.select("#replay-container svg g");
     const width = +d3.select("#replay-container svg").attr("width") - 180 - 120;
@@ -241,6 +327,23 @@ function updateReplay(index) {
         .attr("width", d => getX(d))
         .attr("fill", d => teamColors[d.team] || "#cccccc");
 
+    // NUOVO: Tooltip al passaggio del mouse sull'intera riga
+    carsEnter.append("title")
+        .attr("class", "team-tooltip");
+
+    // NUOVO: Testo interno alla barra per il nome della scuderia
+    carsEnter.append("text")
+        .attr("class", "team-label")
+        .attr("x", 8) // Leggero margine sinistro interno alla barra
+        .attr("y", y.bandwidth() / 2)
+        .attr("text-anchor", "start")
+        .attr("alignment-baseline", "middle")
+        .style("font-size", "11px")
+        .style("font-weight", "bold")
+        .style("letter-spacing", "0.5px")
+        .style("pointer-events", "none"); // Permette al mouse di attraversare il testo per attivare il tooltip
+
+
     carsEnter.append("image")
         .attr("class", "car-avatar")
         .attr("width", y.bandwidth() * 1.5)
@@ -278,6 +381,24 @@ function updateReplay(index) {
     carsUpdate.select(".car-bar")
         .transition(t)
         .attr("width", d => getX(d));
+
+    // NUOVO: Aggiorna il tooltip testuale
+    carsUpdate.select(".team-tooltip")
+        .text(d => `Scuderia: ${d.team.replace(/_/g, " ").toUpperCase()}`);
+
+    // NUOVO: Aggiorna il testo, il colore e la visibilità della scuderia
+    carsUpdate.select(".team-label")
+        .text(d => d.team.replace(/_/g, " ").toUpperCase())
+        .style("fill", d => {
+            const hexColor = teamColors[d.team] || "#cccccc";
+            // Se il colore della barra è bianco (es. Haas, Stewart), usa il grigio scuro
+            return (hexColor.toUpperCase() === "#FFFFFF") ? "#333333" : "#FFFFFF";
+        })
+        .transition(t)
+        .style("opacity", d => {
+            // Se la larghezza della barra è minore di 70px, nasconde il testo in modo fluido
+            return getX(d) > 70 ? 0.8 : 0; 
+        });
 
     // L'avatar non va mai sotto x=0, mentre il nome è bloccato a x=-15
     carsUpdate.select(".car-avatar")
