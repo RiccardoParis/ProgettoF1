@@ -26,30 +26,57 @@
         </div>
 
         <!-- VISTA 2: Replay Singola Gara -->
+        <!-- VISTA 2: Replay Singola Gara -->
         <div id="race-replay-view" class="view-section hidden">
-            <div class="animation-controls" style="justify-content: flex-start;">
+            
+            <!-- Header (Torna al calendario, Titolo) -->
+            <div class="animation-controls" style="justify-content: flex-start; margin-bottom: 20px;">
                 <button id="btn-back-calendar" class="control-btn" style="background: #555;">⬅ Torna al Calendario</button>
                 <div style="margin-left: 20px;">
                     <h2 id="replay-race-title" style="margin: 0; color: #e10600;">Gran Premio</h2>
                     <p id="replay-race-subtitle" style="margin: 0; color: #666; font-size: 0.9rem;">Stagione 0000 - Round 0</p>
                 </div>
             </div>
-            
-            <div class="animation-controls">
-                <button id="btn-play-replay" class="control-btn">▶ Play</button>
+
+            <!-- IL PALCOSCENICO BIANCO PRINCIPALE -->
+            <div style="background: white; border-radius: 8px; padding: 20px 0; min-height: 600px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                 
-                <select id="speed-select" style="margin-left: 10px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">
-                    <option value="1">1x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                </select>
+                <!-- 1. TIMELINE EVENTI (In alto, indipendente) -->
+                <div id="timeline-svg-container" style="width: 100%; height: 85px; margin-bottom: 15px;"></div>
+                
+                <!-- 2. BARRA CONTROLLI (Allineata millimetricamente ai margini D3) -->
+                <div style="display: flex; align-items: center; width: 100%; margin: 5px 0 25px 0;">
+                    
+                    <!-- Spazio Sinistro: 180px (Stesso margine 'left' di D3). Contiene Play e Velocità -->
+                    <div style="width: 180px; display: flex; flex-direction: column; gap: 5px; padding: 0 15px; box-sizing: border-box; justify-content: center; align-items: flex-end;">
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-play-replay" class="control-btn" style="margin: 0; padding: 6px 12px; min-width: 75px;">▶ Play</button>
+                            <select id="speed-select" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">
+                                <option value="1">1x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 10px; width: 100%; justify-content: flex-end;">
+                            <button id="btn-prev-lap" class="control-btn" style="margin: 0; padding: 4px 8px; font-size: 0.8rem; background: #555;">-1 Giro</button>
+                            <button id="btn-next-lap" class="control-btn" style="margin: 0; padding: 4px 8px; font-size: 0.8rem; background: #555;">+1 Giro</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Centro: Lo Slider (Occuperà l'esatta larghezza dell'asse X di D3) -->
+                    <div style="flex-grow: 1;">
+                        <input type="range" id="lap-slider" min="0" max="100" value="0" step="1" style="width: 100%; margin: 0; cursor: pointer;">
+                    </div>
+                    
+                    <!-- Spazio Destro: 120px (Stesso margine 'right' di D3). Contiene i giri -->
+                    <div style="width: 120px; padding: 0 15px; box-sizing: border-box; text-align: left;">
+                        <span id="lap-display" style="font-weight: bold; font-size: 1.1rem; white-space: nowrap;">Giro 0</span>
+                    </div>
 
-                <input type="range" id="lap-slider" min="0" max="100" value="0" step="1">
-                <span id="lap-display">Giro 0</span>
-            </div>
+                </div>
 
-            <!-- Contenitore per l'animazione D3 -->
-            <div id="replay-container" style="background: white; border-radius: 8px; padding: 20px; min-height: 600px;">
+                <!-- 3. GRAFICO DELLE VETTURE (In basso) -->
+                <div id="replay-container" style="width: 100%;"></div>
             </div>
         </div>
     </main>
